@@ -181,13 +181,35 @@ td.name-cell{font-weight:600;color:var(--accent2);cursor:pointer;text-decoration
 
 <script>
 // ═══════════════════════════════════════
-// AUTH SYSTEM
+// AUTH SYSTEM (SHA-256 hashed admin code)
 // ═══════════════════════════════════════
-const ADMIN_CODE = "pesquisa2026"; // <-- Mude este código para o que preferir
+// O código de admin NUNCA aparece aqui — apenas o hash.
+// Para mudar o código: 
+//   1. Abra o console do browser (F12)
+//   2. Cole: hashCode("SEU_NOVO_CODIGO").then(h=>console.log(h))
+//   3. Copie o hash e cole abaixo
+const ADMIN_HASH = "b7641ee97d00a387dbe7f374cde3ea358cb7079a6c86aea63fbd8b0be570f134";
+let _adminHash = null;
 let currentUser = null;
+
+// SHA-256 hash function (async, browser native)
+async function hashCode(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Verifica código de admin contra o hash
+async function verifyAdminCode(code) {
+  if (!code) return false;
+  const h = await hashCode(code);
+  return h === _adminHash;
+}
 
 function getUsers() { return JSON.parse(localStorage.getItem('pn_users') || '[]'); }
 function saveUsers(u) { localStorage.setItem('pn_users', JSON.stringify(u)); }
+
+// Hash das senhas dos utilizadores também
+async function hashPassword(pass) { return await hashCode(pass); }
 
 function showLoginTab(tab) {
   document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
@@ -196,19 +218,20 @@ function showLoginTab(tab) {
   document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
 }
 
-function doLogin() {
+async function doLogin() {
   const user = document.getElementById('loginUser').value.trim();
   const pass = document.getElementById('loginPass').value;
   if (!user || !pass) { showLoginMsg('loginMsg', 'Preencha todos os campos!', 'err'); return; }
   const users = getUsers();
-  const found = users.find(u => u.username === user && u.password === pass);
+  const passHash = await hashPassword(pass);
+  const found = users.find(u => u.username === user && u.passHash === passHash);
   if (!found) { showLoginMsg('loginMsg', 'Utilizador ou senha incorrectos!', 'err'); return; }
   currentUser = found;
   localStorage.setItem('pn_session', JSON.stringify(found));
   enterApp();
 }
 
-function doRegister() {
+async function doRegister() {
   const name = document.getElementById('regName').value.trim();
   const user = document.getElementById('regUser').value.trim();
   const pass = document.getElementById('regPass').value;
@@ -217,8 +240,11 @@ function doRegister() {
   if (pass.length < 4) { showLoginMsg('regMsg', 'Senha mínimo 4 caracteres!', 'err'); return; }
   const users = getUsers();
   if (users.find(u => u.username === user)) { showLoginMsg('regMsg', 'Utilizador já existe!', 'err'); return; }
-  const role = code === ADMIN_CODE ? 'admin' : 'viewer';
-  const newUser = { name, username: user, password: pass, role, created: new Date().toISOString() };
+  const isAdm = await verifyAdminCode(code);
+  const role = isAdm ? 'admin' : 'viewer';
+  if (code && !isAdm) { showLoginMsg('regMsg', 'Código de admin inválido!', 'err'); return; }
+  const passHash = await hashPassword(pass);
+  const newUser = { name, username: user, passHash, role, created: new Date().toISOString() };
   users.push(newUser);
   saveUsers(users);
   currentUser = newUser;
@@ -264,8 +290,9 @@ function showLoginMsg(id, txt, type) {
   setTimeout(() => el.style.display = 'none', 3000);
 }
 
-// Auto-login from session
-(function() {
+// Auto-login from session + init hash
+(async function() {
+  _adminHash = ADMIN_HASH;
   const session = localStorage.getItem('pn_session');
   if (session) { currentUser = JSON.parse(session); enterApp(); }
 })();
