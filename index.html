@@ -181,128 +181,15 @@ td.name-cell{font-weight:600;color:var(--accent2);cursor:pointer;text-decoration
 
 <script>
 // ═══════════════════════════════════════
-// AUTH SYSTEM (SHA-256 hashed admin code)
-// ═══════════════════════════════════════
-// O código de admin NUNCA aparece aqui — apenas o hash.
-// Para mudar o código: 
-//   1. Abra o console do browser (F12)
-//   2. Cole: hashCode("SEU_NOVO_CODIGO").then(h=>console.log(h))
-//   3. Copie o hash e cole abaixo
-const ADMIN_HASH = "b7641ee97d00a387dbe7f374cde3ea358cb7079a6c86aea63fbd8b0be570f134";
-let _adminHash = null;
-let currentUser = null;
-
-// SHA-256 hash function (async, browser native)
-async function hashCode(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
-// Verifica código de admin contra o hash
-async function verifyAdminCode(code) {
-  if (!code) return false;
-  const h = await hashCode(code);
-  return h === _adminHash;
-}
-
-function getUsers() { return JSON.parse(localStorage.getItem('pn_users') || '[]'); }
-function saveUsers(u) { localStorage.setItem('pn_users', JSON.stringify(u)); }
-
-// Hash das senhas dos utilizadores também
-async function hashPassword(pass) { return await hashCode(pass); }
-
-function showLoginTab(tab) {
-  document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
-  event.target.classList.add('active');
-  document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
-  document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
-}
-
-async function doLogin() {
-  const user = document.getElementById('loginUser').value.trim();
-  const pass = document.getElementById('loginPass').value;
-  if (!user || !pass) { showLoginMsg('loginMsg', 'Preencha todos os campos!', 'err'); return; }
-  const users = getUsers();
-  const passHash = await hashPassword(pass);
-  const found = users.find(u => u.username === user && u.passHash === passHash);
-  if (!found) { showLoginMsg('loginMsg', 'Utilizador ou senha incorrectos!', 'err'); return; }
-  currentUser = found;
-  localStorage.setItem('pn_session', JSON.stringify(found));
-  enterApp();
-}
-
-async function doRegister() {
-  const name = document.getElementById('regName').value.trim();
-  const user = document.getElementById('regUser').value.trim();
-  const pass = document.getElementById('regPass').value;
-  const code = document.getElementById('regAdminCode').value.trim();
-  if (!name || !user || !pass) { showLoginMsg('regMsg', 'Preencha todos os campos!', 'err'); return; }
-  if (pass.length < 4) { showLoginMsg('regMsg', 'Senha mínimo 4 caracteres!', 'err'); return; }
-  const users = getUsers();
-  if (users.find(u => u.username === user)) { showLoginMsg('regMsg', 'Utilizador já existe!', 'err'); return; }
-  const isAdm = await verifyAdminCode(code);
-  const role = isAdm ? 'admin' : 'viewer';
-  if (code && !isAdm) { showLoginMsg('regMsg', 'Código de admin inválido!', 'err'); return; }
-  const passHash = await hashPassword(pass);
-  const newUser = { name, username: user, passHash, role, created: new Date().toISOString() };
-  users.push(newUser);
-  saveUsers(users);
-  currentUser = newUser;
-  localStorage.setItem('pn_session', JSON.stringify(newUser));
-  enterApp();
-}
-
-function guestLogin() {
-  currentUser = { name: 'Visitante', username: 'guest', role: 'guest' };
-  enterApp();
-}
-
-function logout() {
-  currentUser = null;
-  localStorage.removeItem('pn_session');
-  document.getElementById('appScreen').style.display = 'none';
-  document.getElementById('loginScreen').style.display = 'flex';
-}
-
-function enterApp() {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('appScreen').style.display = 'flex';
-  document.getElementById('sidebarUserName').textContent = currentUser.name;
-  document.getElementById('sidebarUserRole').textContent = currentUser.role === 'admin' ? 'Admin' : currentUser.role === 'guest' ? 'Visitante' : 'Membro';
-  // Show/hide admin elements
-  const isAdmin = currentUser.role === 'admin';
-  document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
-  document.getElementById('readOnlyBanner').style.display = currentUser.role === 'guest' ? 'block' : 'none';
-  document.getElementById('tabelaBadge').textContent = isAdmin ? 'Clique no nome para editar' : 'Modo leitura';
-  loadData();
-  buildDash();
-  renderTable();
-}
-
-function isAdmin() { return currentUser && currentUser.role === 'admin'; }
-
-function showLoginMsg(id, txt, type) {
-  const el = document.getElementById(id);
-  el.style.display = 'block';
-  el.style.background = type === 'err' ? 'var(--red-bg)' : 'var(--green-bg)';
-  el.style.color = type === 'err' ? 'var(--red)' : 'var(--green)';
-  el.textContent = txt;
-  setTimeout(() => el.style.display = 'none', 3000);
-}
-
-// Auto-login from session + init hash
-(async function() {
-  _adminHash = ADMIN_HASH;
-  const session = localStorage.getItem('pn_session');
-  if (session) { currentUser = JSON.parse(session); enterApp(); }
-})();
-
-// ═══════════════════════════════════════
-// DATA PERSISTENCE (localStorage)
+// DATA FIRST (must be defined before auth)
 // ═══════════════════════════════════════
 const INITIAL_DATA=[{nome:"Erasmo",sexo:"H",grupo:"Menores",idade:9,altura:127,peso:25},{nome:"Vicente",sexo:"H",grupo:"Menores",idade:5,altura:100,peso:13},{nome:"Kenol",sexo:"H",grupo:"Menores",idade:11,altura:119,peso:19},{nome:"Charles",sexo:"H",grupo:"Menores",idade:6,altura:112,peso:19},{nome:"Noragi",sexo:"H",grupo:"Menores",idade:7,altura:127,peso:25},{nome:"Valdo",sexo:"H",grupo:"Menores",idade:6,altura:111,peso:16},{nome:"Ticha",sexo:"H",grupo:"Menores",idade:6,altura:116,peso:19},{nome:"Mael",sexo:"H",grupo:"Menores",idade:8,altura:127,peso:22},{nome:"Andrade",sexo:"M",grupo:"Menores",idade:9,altura:122,peso:23},{nome:"Zairano",sexo:"M",grupo:"Menores",idade:8,altura:122,peso:24},{nome:"Aqueline",sexo:"M",grupo:"Menores",idade:8,altura:113,peso:18},{nome:"Arucha",sexo:"H",grupo:"Menores",idade:9,altura:128,peso:24},{nome:"Naldo",sexo:"H",grupo:"Menores",idade:8,altura:114,peso:18},{nome:"José",sexo:"H",grupo:"Menores",idade:5,altura:98,peso:14},{nome:"Milde",sexo:"M",grupo:"Menores",idade:8,altura:106,peso:16},{nome:"Paiva",sexo:"H",grupo:"Menores",idade:7,altura:110,peso:16},{nome:"Arcila",sexo:"M",grupo:"Menores",idade:5,altura:102,peso:15},{nome:"Angelina",sexo:"M",grupo:"Menores",idade:5,altura:97,peso:15},{nome:"Etelvina",sexo:"M",grupo:"Menores",idade:6,altura:108,peso:20},{nome:"Laura",sexo:"M",grupo:"Menores",idade:7,altura:107,peso:17},{nome:"Adão",sexo:"H",grupo:"Menores",idade:7,altura:116,peso:17},{nome:"Ezequile",sexo:"H",grupo:"Menores",idade:4,altura:95,peso:14},{nome:"Júnior",sexo:"H",grupo:"Menores",idade:4,altura:92,peso:11},{nome:"Amué",sexo:"-",grupo:"Menores",idade:9,altura:null,peso:null},{nome:"Karinha",sexo:"-",grupo:"Menores",idade:9,altura:null,peso:null},{nome:"Rebeca",sexo:"M",grupo:"Menores",idade:1,altura:81,peso:10},{nome:"Paizinho",sexo:"H",grupo:"Menores",idade:9,altura:129,peso:25},{nome:"Valdimiro",sexo:"-",grupo:"Menores",idade:3,altura:87,peso:13},{nome:"Arrique",sexo:"-",grupo:"Menores",idade:4,altura:102,peso:14},{nome:"Melissa",sexo:"M",grupo:"Menores",idade:5,altura:102,peso:13},{nome:"Amilei",sexo:"M",grupo:"Menores",idade:9,altura:126,peso:22},{nome:"Lúcia",sexo:"M",grupo:"Menores",idade:10,altura:135,peso:28},{nome:"Nelinha",sexo:"M",grupo:"Menores",idade:5,altura:102,peso:14},{nome:"Eva",sexo:"-",grupo:"Menores",idade:2,altura:85,peso:11},{nome:"Cristina",sexo:"-",grupo:"Menores",idade:9,altura:125,peso:24},{nome:"Juelma",sexo:"-",grupo:"Menores",idade:7,altura:115,peso:19},{nome:"Mariela",sexo:"M",grupo:"Menores",idade:6,altura:113,peso:19},{nome:"Nonato",sexo:"H",grupo:"Menores",idade:4,altura:93,peso:13},{nome:"Inoque",sexo:"-",grupo:"Menores",idade:8,altura:112,peso:17},{nome:"Edna",sexo:"-",grupo:"Menores",idade:4,altura:96,peso:13},{nome:"Benjamim",sexo:"H",grupo:"Menores",idade:4,altura:94,peso:14},{nome:"Yuri",sexo:"H",grupo:"Menores",idade:6,altura:100,peso:14},{nome:"Pedro",sexo:"H",grupo:"Menores",idade:6,altura:109,peso:15},{nome:"Belucha",sexo:"-",grupo:"Menores",idade:3,altura:93,peso:13},{nome:"Marcela",sexo:"M",grupo:"Menores",idade:2,altura:90,peso:10},{nome:"Francelina",sexo:"M",grupo:"Menores",idade:3,altura:91,peso:11},{nome:"Samuel",sexo:"-",grupo:"Menores",idade:6,altura:null,peso:null},{nome:"Zaqueu",sexo:"-",grupo:"Menores",idade:6,altura:null,peso:null},{nome:"Mónica",sexo:"-",grupo:"Menores",idade:7,altura:null,peso:null},{nome:"Papi",sexo:"-",grupo:"Menores",idade:5,altura:null,peso:null},{nome:"Waido",sexo:"H",grupo:"Maiores",idade:11,altura:130,peso:26},{nome:"Felipe",sexo:"H",grupo:"Maiores",idade:12,altura:150,peso:35},{nome:"Chelton",sexo:"H",grupo:"Maiores",idade:15,altura:148,peso:35},{nome:"Samuel (M)",sexo:"H",grupo:"Maiores",idade:14,altura:147,peso:35},{nome:"Hélio",sexo:"H",grupo:"Maiores",idade:14,altura:154,peso:39},{nome:"Alone",sexo:"H",grupo:"Maiores",idade:12,altura:140,peso:28},{nome:"Ivo",sexo:"H",grupo:"Maiores",idade:15,altura:145,peso:32},{nome:"Laide",sexo:"M",grupo:"Maiores",idade:10,altura:129,peso:23},{nome:"Elsa",sexo:"M",grupo:"Maiores",idade:9,altura:132,peso:22},{nome:"Arsel",sexo:"H",grupo:"Maiores",idade:9,altura:126,peso:24},{nome:"Elton",sexo:"H",grupo:"Maiores",idade:10,altura:135,peso:30},{nome:"José (M)",sexo:"H",grupo:"Maiores",idade:12,altura:155,peso:41},{nome:"Francisco",sexo:"H",grupo:"Maiores",idade:12,altura:144,peso:32},{nome:"Margarida",sexo:"-",grupo:"Maiores",idade:12,altura:146,peso:35},{nome:"Delfina",sexo:"M",grupo:"Maiores",idade:12,altura:135,peso:30},{nome:"Tânia",sexo:"M",grupo:"Maiores",idade:10,altura:131,peso:24},{nome:"Arlete",sexo:"M",grupo:"Maiores",idade:12,altura:124,peso:34},{nome:"Lorena",sexo:"M",grupo:"Maiores",idade:12,altura:145,peso:37},{nome:"Ilda",sexo:"M",grupo:"Maiores",idade:14,altura:155,peso:40},{nome:"Zaqueline",sexo:"M",grupo:"Maiores",idade:9,altura:132,peso:26},{nome:"Edna (M)",sexo:"M",grupo:"Maiores",idade:15,altura:162,peso:48},{nome:"Fabiana",sexo:"M",grupo:"Maiores",idade:18,altura:150,peso:45},{nome:"Lídia",sexo:"M",grupo:"Maiores",idade:15,altura:166,peso:61},{nome:"Birte",sexo:"M",grupo:"Maiores",idade:16,altura:160,peso:47},{nome:"Graça",sexo:"M",grupo:"Maiores",idade:17,altura:151,peso:39},{nome:"Noemia",sexo:"M",grupo:"Maiores",idade:9,altura:128,peso:23},{nome:"Nelinha (M)",sexo:"M",grupo:"Maiores",idade:11,altura:142,peso:30},{nome:"Pequena",sexo:"M",grupo:"Maiores",idade:11,altura:141,peso:30},{nome:"Dulce",sexo:"M",grupo:"Maiores",idade:12,altura:135,peso:27},{nome:"Etelvina (M)",sexo:"M",grupo:"Maiores",idade:10,altura:140,peso:34},{nome:"Jaciara",sexo:"M",grupo:"Maiores",idade:11,altura:150,peso:null},{nome:"Rosa",sexo:"M",grupo:"Maiores",idade:11,altura:134,peso:null},{nome:"Amué (M)",sexo:"H",grupo:"Maiores",idade:9,altura:147,peso:null},{nome:"Lapsone",sexo:"H",grupo:"Maiores",idade:13,altura:147,peso:null},{nome:"Joaquim",sexo:"H",grupo:"Maiores",idade:10,altura:null,peso:null},{nome:"Brenda",sexo:"M",grupo:"Maiores",idade:11,altura:138,peso:null},{nome:"Chana",sexo:"-",grupo:"Maiores",idade:10,altura:128,peso:null},{nome:"Mena",sexo:"-",grupo:"Maiores",idade:10,altura:140,peso:null},{nome:"Kasimba",sexo:"-",grupo:"Maiores",idade:9,altura:null,peso:null},{nome:"Cristina (M)",sexo:"-",grupo:"Maiores",idade:10,altura:null,peso:null},{nome:"Lucressia",sexo:"-",grupo:"Maiores",idade:10,altura:null,peso:null},{nome:"Nicha",sexo:"-",grupo:"Maiores",idade:11,altura:140,peso:null},{nome:"Amândio",sexo:"-",grupo:"Maiores",idade:15,altura:165,peso:null},{nome:"Felizberto",sexo:"-",grupo:"Maiores",idade:14,altura:159,peso:null},{nome:"Celito",sexo:"-",grupo:"Maiores",idade:11,altura:139,peso:null},{nome:"Manucho",sexo:"-",grupo:"Maiores",idade:10,altura:134,peso:null},{nome:"Yuri (M)",sexo:"-",grupo:"Maiores",idade:10,altura:127,peso:null},{nome:"Láci",sexo:"-",grupo:"Maiores",idade:14,altura:160,peso:null},{nome:"Milagre",sexo:"-",grupo:"Maiores",idade:16,altura:150,peso:null}];
 
-let DB, groups, fAnswers, reports, activities, gid;
+let DB=[], groups=[], fAnswers={}, reports=[], activities={}, gid=1;
+
+function calcIMC(p,a){return p&&a?Math.round(p/((a/100)**2)*10)/10:null}
+function cls(v,age){if(!v)return"Incompleto";if(age<=5)return v<13.5?"Crítico":v<14.5?"Risco":v>18?"Risco":"Normal";if(age<=10)return v<13?"Crítico":v<14?"Risco":v>20?"Risco":"Normal";if(age<=15)return v<14.5?"Crítico":v<16?"Risco":v>24?"Risco":"Normal";return v<16?"Crítico":v<18.5?"Risco":v>25?"Risco":"Normal"}
+function recalc(){DB.forEach((c,i)=>{c.n=i+1;c.imc=calcIMC(c.peso,c.altura);c.status=cls(c.imc,c.idade)})}
 
 function loadData() {
   DB = JSON.parse(localStorage.getItem('pn_db') || 'null') || JSON.parse(JSON.stringify(INITIAL_DATA));
@@ -323,9 +210,142 @@ function persist() {
   localStorage.setItem('pn_gid', gid);
 }
 
-function calcIMC(p,a){return p&&a?Math.round(p/((a/100)**2)*10)/10:null}
-function cls(v,age){if(!v)return"Incompleto";if(age<=5)return v<13.5?"Crítico":v<14.5?"Risco":v>18?"Risco":"Normal";if(age<=10)return v<13?"Crítico":v<14?"Risco":v>20?"Risco":"Normal";if(age<=15)return v<14.5?"Crítico":v<16?"Risco":v>24?"Risco":"Normal";return v<16?"Crítico":v<18.5?"Risco":v>25?"Risco":"Normal"}
-function recalc(){DB.forEach((c,i)=>{c.n=i+1;c.imc=calcIMC(c.peso,c.altura);c.status=cls(c.imc,c.idade)})}
+// Load data immediately so it's ready for any login method
+loadData();
+
+// ═══════════════════════════════════════
+// AUTH SYSTEM
+// ═══════════════════════════════════════
+// Admin code hash (SHA-256 of the admin code — code never appears in source)
+// To change: open browser console (F12), run:
+//   hashCode("YOUR_NEW_CODE").then(h=>console.log(h))
+// Then replace the hash below and commit to GitHub.
+const ADMIN_HASH = "b7641ee97d00a387dbe7f374cde3ea358cb7079a6c86aea63fbd8b0be570f134";
+
+// Built-in admin accounts (passwords are SHA-256 hashed)
+// Default admin: username "admin", password "admin2026"
+// You can add more built-in accounts here
+const BUILTIN_ACCOUNTS = [
+  { name: "Administrador", username: "admin", passHash: "fc5c6f645ce9bab tried", role: "admin", builtin: true }
+];
+
+let currentUser = null;
+
+async function hashCode(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Initialize built-in account hash on load
+(async function initBuiltins() {
+  // Hash for "admin2026"
+  const adminPassHash = await hashCode("admin2026");
+  BUILTIN_ACCOUNTS[0].passHash = adminPassHash;
+  
+  // Check auto-login
+  const session = localStorage.getItem('pn_session');
+  if (session) {
+    currentUser = JSON.parse(session);
+    enterApp();
+  }
+})();
+
+function getUsers() {
+  const stored = JSON.parse(localStorage.getItem('pn_users') || '[]');
+  // Merge built-in accounts (don't duplicate)
+  const all = [...BUILTIN_ACCOUNTS];
+  stored.forEach(u => { if (!all.find(a => a.username === u.username)) all.push(u); });
+  return all;
+}
+function saveUsers(u) {
+  // Only save non-builtin users
+  localStorage.setItem('pn_users', JSON.stringify(u.filter(x => !x.builtin)));
+}
+
+function showLoginTab(tab) {
+  document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+}
+
+async function doLogin() {
+  const user = document.getElementById('loginUser').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+  if (!user || !pass) { showLoginMsg('loginMsg', 'Preencha todos os campos!', 'err'); return; }
+  const users = getUsers();
+  const passHash = await hashCode(pass);
+  const found = users.find(u => u.username.toLowerCase() === user && u.passHash === passHash);
+  if (!found) { showLoginMsg('loginMsg', 'Utilizador ou senha incorrectos!', 'err'); return; }
+  currentUser = { name: found.name, username: found.username, role: found.role };
+  localStorage.setItem('pn_session', JSON.stringify(currentUser));
+  enterApp();
+}
+
+async function doRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const user = document.getElementById('regUser').value.trim().toLowerCase();
+  const pass = document.getElementById('regPass').value;
+  const code = document.getElementById('regAdminCode').value.trim();
+  if (!name || !user || !pass) { showLoginMsg('regMsg', 'Preencha todos os campos!', 'err'); return; }
+  if (pass.length < 4) { showLoginMsg('regMsg', 'Senha mínimo 4 caracteres!', 'err'); return; }
+  const users = getUsers();
+  if (users.find(u => u.username.toLowerCase() === user)) { showLoginMsg('regMsg', 'Utilizador já existe!', 'err'); return; }
+  
+  let role = 'viewer';
+  if (code) {
+    const codeHash = await hashCode(code);
+    if (codeHash === ADMIN_HASH) { role = 'admin'; }
+    else { showLoginMsg('regMsg', 'Código de admin inválido!', 'err'); return; }
+  }
+  
+  const passHash = await hashCode(pass);
+  const newUser = { name, username: user, passHash, role, created: new Date().toISOString() };
+  const stored = JSON.parse(localStorage.getItem('pn_users') || '[]');
+  stored.push(newUser);
+  localStorage.setItem('pn_users', JSON.stringify(stored));
+  
+  currentUser = { name, username: user, role };
+  localStorage.setItem('pn_session', JSON.stringify(currentUser));
+  enterApp();
+}
+
+function guestLogin() {
+  currentUser = { name: 'Visitante', username: 'guest', role: 'guest' };
+  enterApp();
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('pn_session');
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+function enterApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'flex';
+  document.getElementById('sidebarUserName').textContent = currentUser.name;
+  document.getElementById('sidebarUserRole').textContent = currentUser.role === 'admin' ? 'Admin' : currentUser.role === 'guest' ? 'Visitante' : 'Membro';
+  const adm = currentUser.role === 'admin';
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = adm ? '' : 'none');
+  document.getElementById('readOnlyBanner').style.display = currentUser.role === 'guest' ? 'block' : 'none';
+  document.getElementById('tabelaBadge').textContent = adm ? 'Clique no nome para editar' : 'Modo leitura';
+  // Data is already loaded, just rebuild UI
+  buildDash();
+  renderTable();
+}
+
+function isAdmin() { return currentUser && currentUser.role === 'admin'; }
+
+function showLoginMsg(id, txt, type) {
+  const el = document.getElementById(id);
+  el.style.display = 'block';
+  el.style.background = type === 'err' ? 'var(--red-bg)' : 'var(--green-bg)';
+  el.style.color = type === 'err' ? 'var(--red)' : 'var(--green)';
+  el.textContent = txt;
+  setTimeout(() => el.style.display = 'none', 3000);
+}
 
 function flash(t,k){const e=document.getElementById('toast');e.textContent=t;e.className='toast show '+(k||'ok');setTimeout(()=>e.className='toast',3000)}
 
